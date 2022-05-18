@@ -2,6 +2,7 @@ import PySimpleGUI as sg
 import asyncio
 import aiohttp
 import json
+import os
 
 api_key = None
 
@@ -39,26 +40,30 @@ window = sg.Window(
 
 
 async def _get_hashrate():
-    window["status"].update("Refreshing...")
-    api_url = "https://slushpool.com/accounts/profile/json/btc/"
-    global api_key
-    key = api_key
-    header = {"SlushPool-Auth-Token": f"{key}"}
-    async with aiohttp.ClientSession() as session:
-        async with session.get(api_url, headers=header) as response:
-            r = await response.text()
-            if r:
-                content = json.loads(r)
-                hashrate = content["btc"]["hash_rate_scoring"]
-                hashrate = round(hashrate / 1000)
+    try:
+        window["status"].update("Refreshing...")
+        api_url = "https://slushpool.com/accounts/profile/json/btc/"
+        global api_key
+        key = api_key
+        header = {"SlushPool-Auth-Token": f"{key}"}
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url, headers=header) as response:
+                r = await response.text()
+                if r:
+                    content = json.loads(r)
+                    hashrate = content["btc"]["hash_rate_scoring"]
+                    hashrate = round(hashrate / 1000)
 
-                if hashrate > 999:
-                    hashrate = f"{round(hashrate / 1000, 2)} PH/s"
-                else:
-                    hashrate = f"{hashrate} TH/s"
+                    if hashrate > 999:
+                        hashrate = f"{round(hashrate / 1000, 2)} PH/s"
+                    else:
+                        hashrate = f"{hashrate} TH/s"
 
-    window["hashrate"].update(hashrate)
-    window["status"].update("Current Hashrate:")
+        window["hashrate"].update(hashrate)
+        window["status"].update("Current Hashrate:")
+    except:
+        window["status"].update("Current Hashrate:")
+        window["hashrate"].update("Error")
 
 
 async def get_hashrate():
@@ -105,6 +110,7 @@ async def setup():
             return
         if event == "setup_done":
             write_api_key(values["api_key"])
+            window.read(0)
             await _get_hashrate()
             setup_window.close()
             return
@@ -114,9 +120,14 @@ async def setup():
 
 
 async def ui():
+    if not os.path.exists("api_key.txt"):
+        await setup()
+    if not os.path.exists("api_key.txt"):
+        return
+
     window.read(0)
-    asyncio.create_task(get_hashrate())
     read_api_key()
+    asyncio.create_task(get_hashrate())
 
     while True:
         event, values = window.read(1)
